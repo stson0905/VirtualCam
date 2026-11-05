@@ -1,0 +1,83 @@
+# 가상 ONVIF 카메라 설정 (다중 카메라 지원)
+# ---------------------------------------------------------------------------
+# 아래 cameras.count 만큼 가상 ONVIF 카메라가 동시에 뜹니다. 각 카메라는
+#   - 자기만의 ONVIF HTTP 포트 (httpPortStart 부터 1씩 증가)
+#   - 자기만의 RTSP 경로 (rtspPathPrefix + 번호, 예: /cam1, /cam2 ...)
+#   - 자기만의 MAC/이름/시리얼 (macPrefix/namePrefix/serialPrefix + 번호)
+# 를 자동으로 부여받습니다. RTSP는 mediamtx 서버 1개가 rtspServer.port 하나로
+# 모든 카메라의 스트림을 함께 서비스합니다(경로로 구분).
+
+# 모든 카메라에 공통 적용되는 기본값. cameras.overrides에서 카메라별로 덮어쓸 수 있습니다.
+cameraDefaults:
+  manufacturer: "VCam"
+  model: "VCAM-1000"
+  firmwareVersion: "1.0.0"
+  hardwareId: "VCAM1"
+  location: "Virtual"
+  stream:
+    width: 1920
+    height: 1080
+    frameRate: 30
+    bitrateKbps: 2048
+    encoding: H264 # 현재 내장 RTSP 서버는 H264만 지원합니다
+  source:
+    # testPattern: ffmpeg의 testsrc 필터로 합성 컬러바 영상을 생성합니다 (별도 파일 불필요, 기본값)
+    # file: source.file 에 지정한 영상 파일을 반복 재생합니다 (비워두면 cameras.sourceFilePattern 사용)
+    #type: "testPattern"
+    type: "file"
+    file: ""
+    # file 소스가 이미 H264 영상이면 재인코딩 없이 그대로 RTSP로 remux합니다(CPU 거의 안 씀).
+    # 이때는 아래 stream.width/height/frameRate/bitrateKbps 대신 실제 파일 값이 ONVIF에 보고됩니다.
+    # 특정 카메라만 항상 재인코딩(해상도/비트레이트 강제 적용)하고 싶으면 forceEncode: true를
+    # cameras.overrides의 해당 카메라 source에 추가하세요.
+    # forceEncode: false
+
+# 카메라 목록 생성 규칙
+cameras:
+  count: 10
+  namePrefix: "Virtual ONVIF Camera" # -> "Virtual ONVIF Camera 1", "... 2", ...
+  macPrefix: "aa:bb:cc:dd:ee:" # -> aa:bb:cc:dd:ee:01, ee:02, ... (16진수 2자리 번호가 붙습니다)
+  serialPrefix: "0000-" # -> 0000-0001, 0000-0002, ...
+  httpPortStart: 8500 # -> 8500, 8501, ... (카메라마다 ONVIF 서비스 포트가 1씩 증가)
+  # 주의: 일부 포트는 Windows가 예약(exclude)해 사용할 수 없는 경우가 있습니다.
+  # "listen EACCES" 에러가 나면 PowerShell에서
+  # netsh interface ipv4 show excludedportrange protocol=tcp
+  # 로 예약 범위를 확인하고 겹치지 않는 값으로 바꾸세요.
+  rtspPathPrefix: "/cam" # -> /cam1, /cam2, ...
+  # source.type을 "file"로 바꾸면, 개별 카메라에 source.file을 지정하지 않는 한
+  # 이 패턴으로 파일 경로가 자동으로 채워집니다. {n}이 카메라 번호(1, 2, 3 ...)로 치환되고,
+  # 상대 경로는 이 프로그램(exe)이 있는 폴더를 기준으로 계산됩니다.
+  # 즉 이 exe와 같은 위치의 cam 폴더에 ch1.mp4 ~ ch10.mp4 를 넣고
+  # cameraDefaults.source.type 을 "file"로 바꾸면 바로 동작합니다.
+  #sourceFilePattern: "D:\\vsproject\\virtualCam\\cam\\ch{n}.mp4"
+  sourceFilePattern: ".\\cam\\ch{n}.mp4"
+  # 특정 카메라만 다른 값을 쓰고 싶을 때 번호(1부터)를 키로 사용해 원하는 항목만 덮어쓰세요.
+  # 예시:
+  # overrides:
+  #   3:
+  #     name: "Loading Dock Camera"
+  #     source: { type: "file", file: "C:\\videos\\dock.mp4" }
+  overrides: {}
+
+network:
+  # ODM이 이 서버를 찾으려면 실제 LAN에 연결된 NIC의 IPv4 주소를 적어야 합니다.
+  # "auto" 로 두면 실행 시 자동으로 첫 번째 외부 IPv4 주소를 사용합니다.
+  advertiseAddress: "auto"
+  discoveryPort: 3702
+
+# 내장 RTSP 스트리밍 서버 (mediamtx + ffmpeg 기반). 모든 카메라가 이 서버 하나를 공유합니다.
+rtspServer:
+  enabled: true
+  port: 8554
+  # ffmpeg / mediamtx 실행 파일 경로. "auto" 로 두면 이 exe와 같은 폴더의 bin\ 을 먼저 찾고,
+  # 없으면 PATH나 winget 설치 위치를 자동으로 탐색합니다.
+  # (mediamtx가 실제 RTSP 서버 역할을 하고, ffmpeg는 영상을 그 안으로 송출합니다)
+  ffmpegPath: "auto"
+  mediamtxPath: "auto"
+
+# ONVIF WS-Security UsernameToken 인증 (선택, 모든 카메라 공통)
+# ODM에 카메라를 추가할 때 계정/비밀번호를 입력해야 하도록 하려면 enabled: true 로 설정하세요.
+auth:
+  enabled: false
+  username: "admin"
+  password: "admin"

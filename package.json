@@ -1,0 +1,24 @@
+{
+  "name": "virtual-onvif-camera",
+  "version": "1.0.0",
+  "description": "Exposes an existing RTSP stream as a virtual ONVIF (Profile S) IP camera discoverable by ODM (ONVIF Device Manager)",
+  "main": "src/index.js",
+  "bin": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "package": "powershell -ExecutionPolicy Bypass -File packaging/build.ps1"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^4.5.0",
+    "js-yaml": "^4.1.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.22.0"
+  },
+  "pkg": {
+    "targets": ["node22-win-x64"]
+  }
+}
